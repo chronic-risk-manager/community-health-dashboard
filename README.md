@@ -12,7 +12,7 @@ Make sure you have **Python 3.10+** installed.
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/chronic-risk-manager/community-health-dashboard.git
 cd CHRONIC_RISK_MANAGER
 ```
 
