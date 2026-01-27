@@ -4,8 +4,8 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 project_root = os.path.dirname(current_dir)
-sys.path.insert(0, current_dir)      # src 目录
-sys.path.insert(0, project_root)     # 项目根目录
+sys.path.insert(0, current_dir)      
+sys.path.insert(0, project_root)     
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
