@@ -12,8 +12,7 @@ Make sure you have **Python 3.10+** installed.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/chronic-risk-manager/community-health-dashboard.git
-cd CHRONIC_RISK_MANAGER
+git clone https://github.com/chronic-risk-manager/community-health-dashboard.gitUpdate the README file
 ```
 
 ### 2. Create and activate virtual environment
