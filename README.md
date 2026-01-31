@@ -37,7 +37,7 @@ pip install -r requirements.txt
 uvicorn src.main:app --reload
 ```
 
-After startup, visit: [http://localhost:8000/docs](http://localhost:8000/docs) for interactive API documentation.
+After startup, visit: [http://localhost:8080/docs](http://localhost:8080/docs) for interactive API documentation.
 
 ---
 
@@ -95,8 +95,8 @@ CHRONIC_RISK_MANAGER/
 
 ## 📡 API Documentation
 
-- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8080/docs)
-- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8080/redoc)
+- **Swagger UI**: [http://localhost:8080/docs](http://localhost:8080/docs)
+- **ReDoc**: [http://localhost:8080/redoc](http://localhost:8080/redoc)
 
 ### Key Endpoints
 
@@ -112,9 +112,3 @@ CHRONIC_RISK_MANAGER/
 ```bash
 pytest src/test_main.py -v
 ```
-
-## 📈 Future Roadmap
-
-- **Phase 3**: Generate 2,000+ simulated clinical records for performance testing.
-- **Phase 4**: Implement advanced health trend analysis APIs.
-- **Phase 5**: Integrate Power BI for community-wide health visualization.
