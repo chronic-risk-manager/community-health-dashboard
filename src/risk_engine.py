@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
-import models
+try:
+    from . import models
+except ImportError:
+    import models
 
 def calculate_risk_level(sys_bp: int, dia_bp: int, glucose: float) -> str:
     """
-    Calculate risk level based on blood pressure and glucose (US-04)
-    Reference standards (common medical criteria):
-    - High: sys >= 160 OR dia >= 100 OR glucose >= 11.1
-    - Med: 140 <= sys < 160 OR 90 <= dia < 100 OR 7.0 <= glucose < 11.1
-    - Low: All other cases
+    Calculate risk level based on blood pressure and glucose (US-04).
+    Standard reference:
+    - High: sys >= 160 or dia >= 100 or glucose >= 11.1
+    - Med: 140 <= sys < 160 or 90 <= dia < 100 or 7.0 <= glucose < 11.1
+    - Low: Otherwise
     """
     if sys_bp >= 160 or dia_bp >= 100 or glucose >= 11.1:
         return "High"
@@ -18,10 +21,10 @@ def calculate_risk_level(sys_bp: int, dia_bp: int, glucose: float) -> str:
 
 def generate_follow_up_task(patient_id: int, risk_level: str) -> models.FollowUp:
     """
-    Automatically generate follow-up task based on risk level (US-07)
+    Automatically generate follow-up task based on risk level (US-07).
     - High: Follow-up within 3 days
     - Med: Follow-up within 7 days
-    - Low: Follow-up within 30 days (routine check)
+    - Low: Follow-up within 30 days (Routine check)
     """
     now = datetime.utcnow()
     if risk_level == "High":
