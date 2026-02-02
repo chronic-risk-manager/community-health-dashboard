@@ -87,3 +87,15 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+class HealthTrend(BaseModel):
+    patient_id: int
+    period_days: int
+    avg_sbp: float
+    avg_dbp: float
+    avg_glucose: float
+    record_count: int
+    status: str  # e.g., "Improving", "Stable", "Deteriorating"
+
+    class Config:
+        from_attributes = True

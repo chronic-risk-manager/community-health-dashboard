@@ -37,7 +37,7 @@ pip install -r requirements.txt
 uvicorn src.main:app --reload
 ```
 
-After startup, visit: [http://localhost:8080/docs](http://localhost:8080/docs) for interactive API documentation.
+After startup, visit: [http://localhost:8000/docs](http://localhost:8000/docs) for interactive API documentation.
 
 ---
 
@@ -69,6 +69,7 @@ CHRONIC_RISK_MANAGER/
 │   ├── test_main.py     # Automated test suite
 │   └── data/            # SQLite database storage
 ├── requirements.txt     # Project dependencies
+├── simulate_data.py     # Data simulation script
 └── README.md            # Project documentation
 ```
 
@@ -91,19 +92,38 @@ CHRONIC_RISK_MANAGER/
 - **CRUD Operations**: Create, Read, Update, and List patients.
 - **Global Follow-ups**: A centralized list for doctors to manage all pending follow-up tasks.
 
+### 4. Comprehensive Trend Analysis
+
+- **Custom Period Averages**: Instant calculation of health metric averages (blood pressure, glucose) over any user-defined time range.
+- **Trend Status Tracking**: Automated classification of patient health trajectories as Improving, Stable, or Deteriorating based on historical data comparison.
+
 ---
 
 ## 📡 API Documentation
 
-- **Swagger UI**: [http://localhost:8080/docs](http://localhost:8080/docs)
-- **ReDoc**: [http://localhost:8080/redoc](http://localhost:8080/redoc)
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-### Key Endpoints
+## 🛣️ API Endpoints
 
-- `POST /token`: Login to get access token.
-- `POST /patients/`: Register a new patient.
-- `POST /indicators/`: Submit health data (triggers risk engine).
-- `GET /followups/`: View all pending follow-up tasks.
+### Authentication
+
+POST /users/: Register a new healthcare professional.
+POST /token: Login to receive a JWT access token.
+
+### Patient Management
+
+POST /patients/: Create a new patient profile.
+GET /patients/: List all patients.
+GET /patients/{id}: Get detailed profile of a specific patient.
+PUT /patients/{id}: Update patient information.
+GET /patients/{id}/trend: Get 30-day health trend analysis.
+
+### Health Data & Risk
+
+POST /indicators/: Submit health readings (triggers risk engine ).
+GET /followups/: View all pending and completed follow-up tasks.
+PATCH /followups/{id}: Update task status (e.g., mark as completed).
 
 ---
 

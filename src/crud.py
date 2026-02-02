@@ -1,6 +1,10 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
+
+from sqlalchemy import func
+from datetime import datetime, timedelta
+
 try:
     from . import models, schemas, risk_engine, auth
 except ImportError:
@@ -93,3 +97,45 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+# Add the logic to calculate averages and determine trends
+def get_patient_trend(db: Session, patient_id: int, days: int = 30):
+    # Calculate the start date for the period
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Query indicators for the patient within the period
+    indicators = db.query(models.HealthIndicator).filter(
+        models.HealthIndicator.patient_id == patient_id,
+        models.HealthIndicator.recorded_at >= start_date
+    ).all()
+    
+    if not indicators:
+        return None
+    
+    # Calculate averages
+    avg_sbp = sum(i.blood_pressure_sys for i in indicators) / len(indicators)
+    avg_dbp = sum(i.blood_pressure_dia for i in indicators) / len(indicators)
+    avg_glucose = sum(i.glucose for i in indicators) / len(indicators)
+    
+    # Simple trend logic (this can be made more complex later)
+    # For now, we'll label it based on the latest risk assessment
+    latest_assessment = db.query(models.RiskAssessment).filter(
+        models.RiskAssessment.patient_id == patient_id
+    ).order_by(models.RiskAssessment.assessment_date.desc()).first()
+    
+    status = "Stable"
+    if latest_assessment:
+        if latest_assessment.risk_level == "High":
+            status = "Deteriorating"
+        elif latest_assessment.risk_level == "Low":
+            status = "Improving"
+            
+    return {
+        "patient_id": patient_id,
+        "period_days": days,
+        "avg_sbp": round(avg_sbp, 1),
+        "avg_dbp": round(avg_dbp, 1),
+        "avg_glucose": round(avg_glucose, 2),
+        "record_count": len(indicators),
+        "status": status
+    }

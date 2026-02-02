@@ -9,10 +9,9 @@ try:
 except ImportError:
     import models, schemas, crud, database, auth
 
-# 初始化数据库表
+
 models.Base.metadata.create_all(bind=database.engine)
 
-# 定义 OAuth2 方案
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI(title="Community Health Dashboard API")
@@ -68,6 +67,16 @@ def update_patient(patient_id: int, patient_update: schemas.PatientUpdate, db: S
     if db_patient is None:
         raise HTTPException(status_code=404, detail="Patient not found")
     return db_patient
+
+
+# Add the new API endpoint to expose this functionality
+@app.get("/patients/{patient_id}/trend", response_model=schemas.HealthTrend)
+def read_patient_trend(patient_id: int, days: int = 30, db: Session = Depends(database.get_db), token: str = Depends(oauth2_scheme)):
+    trend = crud.get_patient_trend(db, patient_id=patient_id, days=days)
+    if trend is None:
+        raise HTTPException(status_code=404, detail="No health data found for this period")
+    return trend
+
 
 # --- Health Indicator Endpoints ---
 
