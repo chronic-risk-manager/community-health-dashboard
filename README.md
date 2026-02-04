@@ -127,6 +127,31 @@ PATCH /followups/{id}: Update task status (e.g., mark as completed).
 
 ---
 
+## 📊 Data Simulation & Analysis
+
+### The system currently includes a robust dataset for demonstration and testing purposes:
+
+Simulated Population: 50 diverse patient profiles.
+Historical Data: ~1,800+ health indicator records spanning the last 90 days.
+Automated Records: Corresponding risk assessments and follow-up tasks for every health entry.
+
+### Trend Analysis API
+
+The new /patients/{patient_id}/trend endpoint provides clinical insights by calculating:
+Average Systolic/Diastolic Blood Pressure.
+Average Glucose levels.
+Patient health status (Improving/Stable/Deteriorating) based on historical trends.
+
+### Data Simulation
+
+To populate the database with demonstration data, run:
+
+```bash
+python simulate_data.py
+```
+
+---
+
 ## 🧪 Running Tests
 
 ```bash
