@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 
 # Health Indicator Schemas
@@ -62,6 +62,15 @@ class Patient(PatientBase):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class PatientBrief(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+class PatientFollowUpGroup(BaseModel):
+    patient: PatientBrief
+    followups: List[FollowUp]
+
 class PatientDetail(Patient):
     indicators: List[HealthIndicator] = []
     assessments: List[RiskAssessment] = []
@@ -99,3 +108,28 @@ class HealthTrend(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Dashboard Schemas
+class DashboardCounts(BaseModel):
+    total_patients: int
+    high_risk_patients: int
+    upcoming_followups: int
+
+class RiskDistribution(BaseModel):
+    high: int
+    medium: int
+    low: int
+
+class WeeklyRegistration(BaseModel):
+    week: str
+    count: int
+
+class AgeDistribution(BaseModel):
+    range: str
+    count: int
+
+class DashboardInfo(BaseModel):
+    counts: DashboardCounts
+    risk_distribution: RiskDistribution
+    weekly_patient_registrations: List[WeeklyRegistration]
+    age_distribution: List[AgeDistribution]

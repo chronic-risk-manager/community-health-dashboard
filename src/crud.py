@@ -1,9 +1,7 @@
 from sqlalchemy.orm import Session
-from datetime import datetime
-from typing import Optional
-
-from sqlalchemy import func
 from datetime import datetime, timedelta
+from typing import Optional, List, Dict
+from sqlalchemy import func, case
 
 try:
     from . import models, schemas, risk_engine, auth
@@ -56,7 +54,16 @@ def create_patient_indicator(db: Session, indicator: schemas.HealthIndicatorCrea
     )
     db.add(db_assessment)
     
-    # 4. Generate Follow-up Task (US-07)
+    # 4. Automatically complete previous pending follow-ups for this patient
+    db.query(models.FollowUp).filter(
+        models.FollowUp.patient_id == indicator.patient_id,
+        models.FollowUp.status == "Pending"
+    ).update({
+        "status": "Completed",
+        "completed_at": datetime.utcnow()
+    }, synchronize_session=False)
+    
+    # 5. Generate new Follow-up Task (US-07)
     db_followup = risk_engine.generate_follow_up_task(indicator.patient_id, risk_level)
     db.add(db_followup)
     
@@ -70,6 +77,25 @@ def get_follow_ups(db: Session, status: Optional[str] = None, skip: int = 0, lim
     if status:
         query = query.filter(models.FollowUp.status == status)
     return query.offset(skip).limit(limit).all()
+
+def get_grouped_follow_ups(db: Session, status: Optional[str] = None):
+    query = db.query(models.FollowUp)
+    if status:
+        query = query.filter(models.FollowUp.status == status)
+    
+    followups = query.all()
+    
+    # Group by patient
+    grouped: Dict[int, schemas.PatientFollowUpGroup] = {}
+    for f in followups:
+        if f.patient_id not in grouped:
+            grouped[f.patient_id] = schemas.PatientFollowUpGroup(
+                patient=schemas.PatientBrief.model_validate(f.patient),
+                followups=[]
+            )
+        grouped[f.patient_id].followups.append(schemas.FollowUp.model_validate(f))
+    
+    return list(grouped.values())
 
 def update_follow_up(db: Session, follow_up_id: int, follow_up_update: schemas.FollowUpUpdate):
     db_followup = db.query(models.FollowUp).filter(models.FollowUp.id == follow_up_id).first()
@@ -98,12 +124,9 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.refresh(db_user)
     return db_user
 
-# Add the logic to calculate averages and determine trends
+# Trend Analysis
 def get_patient_trend(db: Session, patient_id: int, days: int = 30):
-    # Calculate the start date for the period
     start_date = datetime.utcnow() - timedelta(days=days)
-    
-    # Query indicators for the patient within the period
     indicators = db.query(models.HealthIndicator).filter(
         models.HealthIndicator.patient_id == patient_id,
         models.HealthIndicator.recorded_at >= start_date
@@ -112,13 +135,10 @@ def get_patient_trend(db: Session, patient_id: int, days: int = 30):
     if not indicators:
         return None
     
-    # Calculate averages
     avg_sbp = sum(i.blood_pressure_sys for i in indicators) / len(indicators)
     avg_dbp = sum(i.blood_pressure_dia for i in indicators) / len(indicators)
     avg_glucose = sum(i.glucose for i in indicators) / len(indicators)
     
-    # Simple trend logic (this can be made more complex later)
-    # For now, we'll label it based on the latest risk assessment
     latest_assessment = db.query(models.RiskAssessment).filter(
         models.RiskAssessment.patient_id == patient_id
     ).order_by(models.RiskAssessment.assessment_date.desc()).first()
@@ -138,4 +158,79 @@ def get_patient_trend(db: Session, patient_id: int, days: int = 30):
         "avg_glucose": round(avg_glucose, 2),
         "record_count": len(indicators),
         "status": status
+    }
+
+# Dashboard Operations
+def get_dashboard_info(db: Session):
+    # 1. Counts
+    total_patients = db.query(func.count(models.Patient.id)).scalar()
+    
+    # High risk patients (latest assessment is High)
+    subquery = db.query(
+        models.RiskAssessment.patient_id,
+        func.max(models.RiskAssessment.assessment_date).label('max_date')
+    ).group_by(models.RiskAssessment.patient_id).subquery()
+    
+    high_risk_count = db.query(func.count(models.RiskAssessment.id)).join(
+        subquery, 
+        (models.RiskAssessment.patient_id == subquery.c.patient_id) & 
+        (models.RiskAssessment.assessment_date == subquery.c.max_date)
+    ).filter(models.RiskAssessment.risk_level == "High").scalar()
+    
+    upcoming_followups = db.query(func.count(models.FollowUp.id)).filter(
+        models.FollowUp.status == "Pending",
+        models.FollowUp.due_date >= datetime.utcnow()
+    ).scalar()
+    
+    # 2. Risk Distribution
+    risk_dist = db.query(
+        models.RiskAssessment.risk_level,
+        func.count(models.RiskAssessment.id)
+    ).join(
+        subquery,
+        (models.RiskAssessment.patient_id == subquery.c.patient_id) &
+        (models.RiskAssessment.assessment_date == subquery.c.max_date)
+    ).group_by(models.RiskAssessment.risk_level).all()
+    
+    risk_map = {"High": 0, "Med": 0, "Low": 0}
+    for level, count in risk_dist:
+        if level in risk_map:
+            risk_map[level] = count
+            
+    # 3. Weekly Registrations (Last 4 weeks)
+    four_weeks_ago = datetime.utcnow() - timedelta(weeks=4)
+    weekly_reg = db.query(
+        func.strftime('%Y-%W', models.Patient.created_at).label('week'),
+        func.count(models.Patient.id)
+    ).filter(models.Patient.created_at >= four_weeks_ago).group_by('week').all()
+    
+    weekly_data = [{"week": w, "count": c} for w, c in weekly_reg]
+    
+    # 4. Age Distribution
+    age_dist = db.query(
+        case(
+            (models.Patient.age < 18, "0-17"),
+            (models.Patient.age < 35, "18-34"),
+            (models.Patient.age < 55, "35-54"),
+            (models.Patient.age < 75, "55-74"),
+            else_="75+"
+        ).label('age_range'),
+        func.count(models.Patient.id)
+    ).group_by('age_range').all()
+    
+    age_data = [{"range": r, "count": c} for r, c in age_dist]
+    
+    return {
+        "counts": {
+            "total_patients": total_patients,
+            "high_risk_patients": high_risk_count,
+            "upcoming_followups": upcoming_followups
+        },
+        "risk_distribution": {
+            "high": risk_map["High"],
+            "medium": risk_map["Med"],
+            "low": risk_map["Low"]
+        },
+        "weekly_patient_registrations": weekly_data,
+        "age_distribution": age_data
     }
