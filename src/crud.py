@@ -1,7 +1,8 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from sqlalchemy import func, case
+
 
 try:
     from . import models, schemas, risk_engine, auth
@@ -79,22 +80,33 @@ def get_follow_ups(db: Session, status: Optional[str] = None, skip: int = 0, lim
     return query.offset(skip).limit(limit).all()
 
 def get_grouped_follow_ups(db: Session, status: Optional[str] = None):
-    query = db.query(models.FollowUp)
+    query = (
+        db.query(models.FollowUp)
+        .options(joinedload(models.FollowUp.patient))  # ✅ load relationship
+    )
+
     if status:
         query = query.filter(models.FollowUp.status == status)
-    
+
     followups = query.all()
-    
-    # Group by patient
+
     grouped: Dict[int, schemas.PatientFollowUpGroup] = {}
+
     for f in followups:
+        # 🚨 Safety check
+        if f.patient is None:
+            continue  # skip broken records
+
         if f.patient_id not in grouped:
             grouped[f.patient_id] = schemas.PatientFollowUpGroup(
                 patient=schemas.PatientBrief.model_validate(f.patient),
                 followups=[]
             )
-        grouped[f.patient_id].followups.append(schemas.FollowUp.model_validate(f))
-    
+
+        grouped[f.patient_id].followups.append(
+            schemas.FollowUp.model_validate(f)
+        )
+
     return list(grouped.values())
 
 def update_follow_up(db: Session, follow_up_id: int, follow_up_update: schemas.FollowUpUpdate):
