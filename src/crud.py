@@ -1,8 +1,7 @@
-from sqlalchemy.orm import Session, joinedload
-from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 from sqlalchemy import func, case
-
 
 try:
     from . import models, schemas, risk_engine, auth
@@ -61,7 +60,7 @@ def create_patient_indicator(db: Session, indicator: schemas.HealthIndicatorCrea
         models.FollowUp.status == "Pending"
     ).update({
         "status": "Completed",
-        "completed_at": datetime.utcnow()
+        "completed_at": datetime.now(timezone.utc)
     }, synchronize_session=False)
     
     # 5. Generate new Follow-up Task (US-07)
@@ -80,33 +79,22 @@ def get_follow_ups(db: Session, status: Optional[str] = None, skip: int = 0, lim
     return query.offset(skip).limit(limit).all()
 
 def get_grouped_follow_ups(db: Session, status: Optional[str] = None):
-    query = (
-        db.query(models.FollowUp)
-        .options(joinedload(models.FollowUp.patient))  # ✅ load relationship
-    )
-
+    query = db.query(models.FollowUp)
     if status:
         query = query.filter(models.FollowUp.status == status)
-
+    
     followups = query.all()
-
+    
+    # Group by patient
     grouped: Dict[int, schemas.PatientFollowUpGroup] = {}
-
     for f in followups:
-        # 🚨 Safety check
-        if f.patient is None:
-            continue  # skip broken records
-
         if f.patient_id not in grouped:
             grouped[f.patient_id] = schemas.PatientFollowUpGroup(
                 patient=schemas.PatientBrief.model_validate(f.patient),
                 followups=[]
             )
-
-        grouped[f.patient_id].followups.append(
-            schemas.FollowUp.model_validate(f)
-        )
-
+        grouped[f.patient_id].followups.append(schemas.FollowUp.model_validate(f))
+    
     return list(grouped.values())
 
 def update_follow_up(db: Session, follow_up_id: int, follow_up_update: schemas.FollowUpUpdate):
@@ -138,7 +126,7 @@ def create_user(db: Session, user: schemas.UserCreate):
 
 # Trend Analysis
 def get_patient_trend(db: Session, patient_id: int, days: int = 30):
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
     indicators = db.query(models.HealthIndicator).filter(
         models.HealthIndicator.patient_id == patient_id,
         models.HealthIndicator.recorded_at >= start_date
@@ -174,6 +162,7 @@ def get_patient_trend(db: Session, patient_id: int, days: int = 30):
 
 # Dashboard Operations
 def get_dashboard_info(db: Session):
+    now = datetime.now(timezone.utc)
     # 1. Counts
     total_patients = db.query(func.count(models.Patient.id)).scalar()
     
@@ -191,7 +180,7 @@ def get_dashboard_info(db: Session):
     
     upcoming_followups = db.query(func.count(models.FollowUp.id)).filter(
         models.FollowUp.status == "Pending",
-        models.FollowUp.due_date >= datetime.utcnow()
+        models.FollowUp.due_date >= now
     ).scalar()
     
     # 2. Risk Distribution
@@ -210,7 +199,7 @@ def get_dashboard_info(db: Session):
             risk_map[level] = count
             
     # 3. Weekly Registrations (Last 4 weeks)
-    four_weeks_ago = datetime.utcnow() - timedelta(weeks=4)
+    four_weeks_ago = now - timedelta(weeks=4)
     weekly_reg = db.query(
         func.strftime('%Y-%W', models.Patient.created_at).label('week'),
         func.count(models.Patient.id)

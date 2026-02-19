@@ -105,9 +105,7 @@ class HealthTrend(BaseModel):
     avg_glucose: float
     record_count: int
     status: str  # e.g., "Improving", "Stable", "Deteriorating"
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Dashboard Schemas
 class DashboardCounts(BaseModel):

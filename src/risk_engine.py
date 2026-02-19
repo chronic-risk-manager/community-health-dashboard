@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 try:
     from . import models
 except ImportError:
@@ -26,7 +26,7 @@ def generate_follow_up_task(patient_id: int, risk_level: str) -> models.FollowUp
     - Med: Follow-up within 7 days
     - Low: Follow-up within 30 days (Routine check)
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if risk_level == "High":
         due_date = now + timedelta(days=3)
         description = "Urgent follow-up required due to high risk indicators."
